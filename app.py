@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import urllib.parse
+import time # নতুন যোগ করা হয়েছে
 from streamlit_gsheets import GSheetsConnection 
 
 st.set_page_config(page_title="ভাড়া ব্যবস্থাপনা", page_icon="🏠", layout="centered", initial_sidebar_state="collapsed")
@@ -44,22 +45,19 @@ div[data-testid="stSelectbox"] > div > div, div[data-testid="stNumberInput"] inp
 .stTextArea textarea { background:#1a2e40 !important; border:1px solid #2a4a60 !important; color:#c8d8e8 !important; font-size:0.9rem !important; font-family:'Hind Siliguri',sans-serif !important; }
 .stButton > button { background:#f0c040 !important; color:#0d1b2a !important; font-weight:700 !important; font-size:1rem !important; font-family:'Hind Siliguri',sans-serif !important; border:none !important; border-radius:10px !important; padding:12px !important; width:100% !important; }
 .wa-link { display:block; text-align:center; background:#0e2319; border:2px solid #25d366; border-radius:10px; color:#25d366 !important; font-weight:700; font-size:1rem; padding:12px; text-decoration:none; margin-top:4px; }
-.streamlit-expanderHeader { color:#7a9ab5 !important; font-size:0.95rem !important; }
 .info-box { background:#12263a; border:1px solid #2a5070; border-radius:10px; padding:10px 14px; margin-top:8px; font-size:0.92rem; color:#7a9ab5; }
-div[data-testid="stCheckbox"] label { color:#ff6b6b !important; font-size:0.95rem !important; font-weight:600; font-family:'Hind Siliguri',sans-serif !important; }
+div[data-testid="stCheckbox"] label, div[data-testid="stToggle"] label { color:#ff6b6b !important; font-size:0.95rem !important; font-weight:600; font-family:'Hind Siliguri',sans-serif !important; }
 div[data-testid="stRadio"] p { color: #f0c040 !important; font-size: 1.1rem !important; font-weight: 700 !important; font-family: 'Hind Siliguri', sans-serif !important; }
 </style>
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# গুগল শিট কানেকশন (Cloud DB)
+# গুগল শিট কানেকশন
 # ─────────────────────────────────────────────
-# আপনার দেওয়া অরিজিনাল লিংক
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1uaa_BTXwBawrAKhWpSA-nQOQvHST68Cv9UeotVFsPYg/edit?usp=sharing"
-
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-@st.cache_data(ttl=1) # 1 সেকেন্ড পর পর রিফ্রেশ হবে যাতে ডাটা লাইভ থাকে
+@st.cache_data(ttl=1) 
 def load_data():
     return conn.read(spreadsheet=SHEET_URL, usecols=[0,1,2,3,4,5,6])
 
@@ -79,11 +77,10 @@ def today_str():
     n = datetime.now()
     return f"{n.day} {BENGALI_MONTHS[n.month-1]}, {n.year}"
 
-# লাইভ ডাটাবেজ কল
 try:
     df = load_data()
 except Exception as e:
-    st.error(f"ডাটাবেজ কানেক্ট হতে সমস্যা হচ্ছে। Secrets বা Sheet URL চেক করুন। Error: {e}")
+    st.error(f"ডাটাবেজ কানেক্ট হতে সমস্যা হচ্ছে। Error: {e}")
     st.stop()
 
 st.markdown('<div class="app-title">🏠 ভাড়া ব্যবস্থাপনা সিস্টেম</div>', unsafe_allow_html=True)
@@ -98,7 +95,6 @@ room_idx = df[df['রুম'] == selected_room].index[0]
 room_num = room_idx + 1
 has_elec = (room_num <= 6)
 
-fixed_rent    = int(row['নির্ধারিত ভাড়া'])
 past_rent_due = int(row['বকেয়া ভাড়া'])
 past_garb_due = int(row['বকেয়া ময়লা'])
 past_elec_due = int(row['বকেয়া বিদ্যুৎ'])
@@ -107,37 +103,58 @@ prev_reading  = int(row['আগের রিডিং'])
 st.markdown(f"""
 <div class="pill-row">
   <span class="pill">📞 {row['ফোন নম্বর']}</span>
-  <span class="pill">💰 ভাড়া {fixed_rent} টাকা</span>
+  <span class="pill">💰 ভাড়া {int(row['নির্ধারিত ভাড়া'])} টাকা</span>
   <span class="pill">{'⚡ বিদ্যুৎ আছে' if has_elec else '🚫 বিদ্যুৎ নেই'}</span>
 </div>
 """, unsafe_allow_html=True)
 
 if past_rent_due > 0 or past_garb_due > 0 or past_elec_due > 0:
     due_parts = []
-    if past_rent_due  > 0: due_parts.append(f"ভাড়া {past_rent_due} টাকা")
-    if past_garb_due  > 0: due_parts.append(f"ময়লা {past_garb_due} টাকা")
-    if past_elec_due  > 0: due_parts.append(f"বিদ্যুৎ {past_elec_due} টাকা")
+    if past_rent_due  > 0: due_parts.append(f"ভাড়া {past_rent_due} ৳")
+    if past_garb_due  > 0: due_parts.append(f"ময়লা {past_garb_due} ৳")
+    if past_elec_due  > 0: due_parts.append(f"বিদ্যুৎ {past_elec_due} ৳")
     st.markdown(f'<div class="info-box">⚠️ পূর্ববর্তী বকেয়া: {" | ".join(due_parts)}</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown('<div class="card"><div class="card-title"><span class="badge">২</span> চলতি মাসের বিল হিসাব</div>', unsafe_allow_html=True)
+# ---------------------------------------------------------
+# নতুন লজিক: চলতি মাসের বিল হিসাব
+# ---------------------------------------------------------
+st.markdown('<div class="card"><div class="card-title"><span class="badge">২</span> বিল হিসাব</div>', unsafe_allow_html=True)
+
+# বকেয়া মোড সুইচ
+only_due_mode = st.toggle("🔄 শুধু বকেয়া বা আংশিক পেমেন্ট (নতুন বিল যোগ হবে না)", key=f"due_mode_{selected_room}")
+
 pm = PREV_MONTH_MAP[datetime.now().month]
 cm = BENGALI_MONTHS[datetime.now().month - 1]
 
-if past_rent_due > 0:
-    st.markdown(f'<div class="row"><span class="rl">🏷️ {pm} মাসের বকেয়া ভাড়া</span><span class="rv red">{past_rent_due} টাকা</span></div><div class="row"><span class="rl">🏷️ {pm} মাসের নিয়মিত ভাড়া</span><span class="rv">{fixed_rent} টাকা</span></div><div class="row"><span class="rl" style="color:#c8d0e0;font-weight:600;">সর্বমোট প্রদেয় ভাড়া</span><span class="rv gold">{past_rent_due + fixed_rent} টাকা</span></div>', unsafe_allow_html=True)
+if only_due_mode:
+    fixed_rent = 0
+    garbage_this_month = 0
+    st.markdown('<div class="info-box" style="color:#f0c040; text-align:center;">⚠️ বকেয়া মোড চালু আছে। এই মাসের নতুন বিল হিসাব করা হচ্ছে না।</div>', unsafe_allow_html=True)
 else:
-    st.markdown(f'<div class="row"><span class="rl">🏷️ {pm} মাসের ভাড়া <span style="font-size:0.85rem;color:#5a8090;">(পোস্টপেইড)</span></span><span class="rv">{fixed_rent} টাকা</span></div>', unsafe_allow_html=True)
+    fixed_rent = int(row['নির্ধারিত ভাড়া'])
+    garbage_this_month = GARBAGE_BILL
 
 total_rent_payable = fixed_rent + past_rent_due
+
+if past_rent_due > 0:
+    if only_due_mode:
+        st.markdown(f'<div class="row"><span class="rl">🏷️ পূর্বের বকেয়া ভাড়া</span><span class="rv red">{past_rent_due} টাকা</span></div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div class="row"><span class="rl">🏷️ পূর্বের বকেয়া ভাড়া</span><span class="rv red">{past_rent_due} টাকা</span></div><div class="row"><span class="rl">🏷️ {pm} মাসের নিয়মিত ভাড়া</span><span class="rv">{fixed_rent} টাকা</span></div><div class="row"><span class="rl" style="color:#c8d0e0;font-weight:600;">সর্বমোট প্রদেয় ভাড়া</span><span class="rv gold">{total_rent_payable} টাকা</span></div>', unsafe_allow_html=True)
+else:
+    st.markdown(f'<div class="row"><span class="rl">🏷️ {pm} মাসের ভাড়া</span><span class="rv">{fixed_rent} টাকা</span></div>', unsafe_allow_html=True)
+
 st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
-garbage_this_month    = GARBAGE_BILL
 total_garbage_payable = garbage_this_month + past_garb_due
 
 if past_garb_due > 0:
-    st.markdown(f'<div class="row"><span class="rl">🗑️ পূর্বের বকেয়া ময়লা বিল</span><span class="rv red">{past_garb_due} টাকা</span></div><div class="row"><span class="rl">🗑️ {pm} মাসের ময়লা বিল</span><span class="rv">{garbage_this_month} টাকা</span></div><div class="row"><span class="rl" style="color:#c8d0e0;font-weight:600;">সর্বমোট প্রদেয় ময়লা বিল</span><span class="rv gold">{total_garbage_payable} টাকা</span></div>', unsafe_allow_html=True)
+    if only_due_mode:
+        st.markdown(f'<div class="row"><span class="rl">🗑️ পূর্বের বকেয়া ময়লা বিল</span><span class="rv red">{past_garb_due} টাকা</span></div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div class="row"><span class="rl">🗑️ পূর্বের বকেয়া ময়লা বিল</span><span class="rv red">{past_garb_due} টাকা</span></div><div class="row"><span class="rl">🗑️ {pm} মাসের ময়লা বিল</span><span class="rv">{garbage_this_month} টাকা</span></div><div class="row"><span class="rl" style="color:#c8d0e0;font-weight:600;">সর্বমোট প্রদেয় ময়লা বিল</span><span class="rv gold">{total_garbage_payable} টাকা</span></div>', unsafe_allow_html=True)
 else:
     st.markdown(f'<div class="row"><span class="rl">🗑️ {pm} মাসের ময়লা বিল</span><span class="rv">{garbage_this_month} টাকা</span></div>', unsafe_allow_html=True)
 
@@ -149,23 +166,31 @@ total_elec_payable = 0
 
 if has_elec:
     st.markdown(f'<div class="row"><span class="rl">⚡ সর্বশেষ পরিশোধিত রিডিং</span><span class="rv blue">{prev_reading}</span></div>', unsafe_allow_html=True)
-    current_reading = st.number_input("বর্তমান মিটার রিডিং:", min_value=0, value=0, step=1, key=f"meter_{selected_room}")
     
-    if current_reading > 0 and current_reading < prev_reading:
-        st.error("⚠️ মিটার রিডিং ভুল দিয়েছেন, আবার চেক করুন!")
-        used_units = 0
+    if only_due_mode:
+        total_elec_payable = past_elec_due
+        if past_elec_due > 0:
+            st.markdown(f'<div class="row"><span class="rl">⚡ পূর্বের বকেয়া বিদ্যুৎ বিল</span><span class="rv red">{past_elec_due} টাকা</span></div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="row"><span class="rl">⚡ বকেয়া বিদ্যুৎ বিল</span><span class="rv">0 টাকা</span></div>', unsafe_allow_html=True)
     else:
-        used_units = current_reading - prev_reading if current_reading > prev_reading else 0
+        current_reading = st.number_input("বর্তমান মিটার রিডিং:", min_value=0, value=0, step=1, key=f"meter_{selected_room}")
         
-    total_elec_payable = used_units * ELEC_RATE
+        if current_reading > 0 and current_reading < prev_reading:
+            st.error("⚠️ মিটার রিডিং ভুল দিয়েছেন, আবার চেক করুন!")
+            used_units = 0
+        else:
+            used_units = current_reading - prev_reading if current_reading > prev_reading else 0
+            
+        total_elec_payable = used_units * ELEC_RATE
 
-    if past_elec_due > 0:
-        new_units_only = used_units - (past_elec_due // ELEC_RATE)
-        if new_units_only < 0: new_units_only = 0
-        elec_this_month_only = new_units_only * ELEC_RATE
-        st.markdown(f'<div class="row"><span class="rl">⚡ পূর্বের বকেয়া বিদ্যুৎ বিল</span><span class="rv red">{past_elec_due} টাকা</span></div><div class="row"><span class="rl">⚡ চলতি মাসের বিদ্যুৎ ({new_units_only} ইউনিট × ১০)</span><span class="rv">{elec_this_month_only} টাকা</span></div><div class="row"><span class="rl" style="color:#c8d0e0;font-weight:600;">সর্বমোট প্রদেয় বিদ্যুৎ বিল</span><span class="rv gold">{total_elec_payable} টাকা</span></div>', unsafe_allow_html=True)
-    else:
-        st.markdown(f'<div class="row"><span class="rl">⚡ মোট ব্যবহৃত বিদ্যুৎ ({used_units} ইউনিট × ১০)</span><span class="rv">{total_elec_payable} টাকা</span></div>', unsafe_allow_html=True)
+        if past_elec_due > 0:
+            new_units_only = used_units - (past_elec_due // ELEC_RATE)
+            if new_units_only < 0: new_units_only = 0
+            elec_this_month_only = new_units_only * ELEC_RATE
+            st.markdown(f'<div class="row"><span class="rl">⚡ পূর্বের বকেয়া বিদ্যুৎ বিল</span><span class="rv red">{past_elec_due} টাকা</span></div><div class="row"><span class="rl">⚡ চলতি মাসের বিদ্যুৎ ({new_units_only} ইউনিট × ১০)</span><span class="rv">{elec_this_month_only} টাকা</span></div><div class="row"><span class="rl" style="color:#c8d0e0;font-weight:600;">সর্বমোট প্রদেয় বিদ্যুৎ বিল</span><span class="rv gold">{total_elec_payable} টাকা</span></div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="row"><span class="rl">⚡ মোট ব্যবহৃত বিদ্যুৎ ({used_units} ইউনিট × ১০)</span><span class="rv">{total_elec_payable} টাকা</span></div>', unsafe_allow_html=True)
 else:
     st.markdown('<div class="row"><span class="rl">⚡ বিদ্যুৎ বিল</span><span class="rv" style="color:#4a6070;">প্রযোজ্য নয়</span></div>', unsafe_allow_html=True)
 
@@ -174,6 +199,9 @@ grand_total = total_rent_payable + total_garbage_payable + total_elec_payable
 st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 st.markdown(f'<div class="row"><span class="rl" style="color:#f0c040;font-weight:700;font-size:1.05rem;">সর্বমোট প্রদেয় বিল</span><span class="rv gold" style="font-size:1.1rem;">{grand_total} টাকা</span></div></div>', unsafe_allow_html=True)
 
+# ---------------------------------------------------------
+# পেমেন্ট সেকশন
+# ---------------------------------------------------------
 st.markdown('<div class="card"><div class="card-title"><span class="badge">৩</span> বিল পরিশোধ (Payment)</div>', unsafe_allow_html=True)
 
 received = st.number_input("প্রাপ্ত টাকার পরিমাণ (জমা):", min_value=0, value=0, step=50, key=f"pay_{selected_room}")
@@ -190,7 +218,11 @@ new_elec_due    = total_elec_payable    - elec_paid
 total_due       = new_rent_due + new_garbage_due + new_elec_due
 
 paid_elec_units   = elec_paid // ELEC_RATE
-due_elec_units    = used_units - paid_elec_units
+if only_due_mode:
+    due_elec_units = (past_elec_due // ELEC_RATE) - paid_elec_units
+else:
+    due_elec_units = used_units - paid_elec_units
+
 new_saved_reading = (prev_reading + paid_elec_units) if has_elec else prev_reading
 
 st.markdown('</div>', unsafe_allow_html=True)
@@ -204,19 +236,19 @@ if received > 0 or process_zero:
     else:
         st.markdown(f'<div class="sbox red"><div class="sbox-title" style="color:#ff6b6b;">⚠️ বর্তমান বকেয়া (Due)</div><div class="row"><span class="rl">সর্বমোট বকেয়া</span><span class="rv red">{total_due} টাকা</span></div><div class="row"><span class="rl">ভাড়া বকেয়া</span><span class="rv red">{new_rent_due} টাকা</span></div><div class="row"><span class="rl">ময়লা বিল বকেয়া</span><span class="rv red">{new_garbage_due} টাকা</span></div><div class="row"><span class="rl">বিদ্যুৎ বিল বকেয়া</span><span class="rv red">{new_elec_due} টাকা{f" ({due_elec_units} ইউনিট)" if has_elec and due_elec_units > 0 else ""}</span></div></div>', unsafe_allow_html=True)
 
-    if has_elec and new_elec_due > 0:
+    if has_elec and elec_paid > 0:
         st.markdown(f'<div class="info-box">🔌 <strong style="color:#c8d8e8;">মিটার আপডেট:</strong> {prev_reading} + {paid_elec_units} ইউনিট পরিশোধিত = <strong style="color:#f0c040;">নতুন সেভড রিডিং: {new_saved_reading}</strong></div>', unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('<div class="card"><div class="card-title">📲 রসিদ ও সেভ</div>', unsafe_allow_html=True)
 
-    lines = [f"ভাড়া রসিদ\n\nইউনিট: {room_num}\nমাস: {cm}\n({pm} মাসের বিল — পোস্টপেইড)\n\nভাড়া: {total_rent_payable}\nময়লা বিল: {total_garbage_payable}\nবিদ্যুৎ বিল: {total_elec_payable}\n\nমোট বিল: {grand_total}\n\nজমা/পরিশোধ: {received} টাকা\n"]
+    mode_text = "(বকেয়া বিল পেমেন্ট)" if only_due_mode else f"({pm} মাসের বিল — পোস্টপেইড)"
+    lines = [f"ভাড়া রসিদ\n\nইউনিট: {room_num}\nমাস: {cm}\n{mode_text}\n\nভাড়া: {total_rent_payable}\nময়লা বিল: {total_garbage_payable}\nবিদ্যুৎ বিল: {total_elec_payable}\n\nমোট বিল: {grand_total}\n\nজমা/পরিশোধ: {received} টাকা\n"]
+    
     if total_due == 0:
         lines.append("\n🎉 সম্পূর্ণ বিল পরিশোধিত। কোনো বকেয়া নেই!")
     else:
         lines.append(f"বর্তমান বকেয়া: {total_due} টাকা\n\nবকেয়ার বিবরণ:\n- ভাড়া: {new_rent_due} টাকা\n- ময়লা: {new_garbage_due} টাকা\n- বিদ্যুৎ: {new_elec_due} টাকা")
-        if has_elec and used_units > 0:
-            lines.append(f"(মোট {used_units} ইউনিটের মধ্যে {paid_elec_units} ইউনিটের বিল পরিশোধিত। {due_elec_units} ইউনিটের বিল বকেয়া আছে।)")
 
     receipt_text = "\n".join(lines)
     st.text_area("রসিদ প্রিভিউ", receipt_text, height=270)
@@ -225,7 +257,9 @@ if received > 0 or process_zero:
     with col1:
         if st.button("💾 ক্লাউডে আপডেট ও সেভ করুন"):
             save_to_gsheets(df, room_idx, new_rent_due, new_garbage_due, new_elec_due, new_saved_reading)
-            st.success("✅ ডেটা গুগল শিটে সেভ হয়েছে!")
+            st.success("✅ ডেটা সফলভাবে ক্লাউডে সেভ হয়েছে!")
+            
+            time.sleep(2) # ২ সেকেন্ড অপেক্ষা করবে যেন মেসেজটা পড়া যায়
             st.rerun()
 
     with col2:
@@ -237,7 +271,3 @@ if received > 0 or process_zero:
 
 else:
     st.markdown('<div class="info-box" style="text-align:center;">💡 পেমেন্টের ঘরে টাকার পরিমাণ লিখলে অথবা শূন্য পেমেন্ট বক্সে টিক দিলে অ্যাডমিন সামারি এবং সেভ অপশন চালু হবে।</div>', unsafe_allow_html=True)
-
-with st.expander("📊 ক্লাউড ডাটাবেজ দেখুন (Google Sheets)"):
-    show = df[['রুম','নির্ধারিত ভাড়া','আগের রিডিং','বকেয়া ভাড়া','বকেয়া ময়লা','বকেয়া বিদ্যুৎ']].copy()
-    st.dataframe(show, use_container_width=True, hide_index=True)
