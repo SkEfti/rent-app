@@ -208,9 +208,33 @@ new_elec_due    = total_elec_payable    - elec_paid
 total_due       = new_rent_due + new_garbage_due + new_elec_due
 
 paid_elec_units   = elec_paid // ELEC_RATE
+if auto_due_mode:
+    due_elec_units = (past_elec_due // ELEC_RATE) - paid_elec_units
+else:
+    due_elec_units = used_units - paid_elec_units
+
 new_saved_reading = (prev_reading + paid_elec_units) if has_elec else prev_reading
 
+st.markdown('</div>', unsafe_allow_html=True)
+
 if received > 0 or process_zero:
+    # --- রিস্টোর করা অ্যাডমিন সামারি অংশ (Admin Summary) ---
+    st.markdown('<div class="card"><div class="card-title"><span class="badge">৪</span> হিসাবের সারসংক্ষেপ (Admin)</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="sbox green"><div class="sbox-title" style="color:#3dd68c;">✅ জমাকৃত বিলের বিবরণ</div><div class="row"><span class="rl">মোট জমাকৃত অর্থ</span><span class="rv green">{received} টাকা</span></div><div class="row"><span class="rl">ভাড়া বাবদ জমা</span><span class="rv">{rent_paid} টাকা</span></div><div class="row"><span class="rl">ময়লা বিল বাবদ</span><span class="rv">{garbage_paid} টাকা</span></div><div class="row"><span class="rl">বিদ্যুৎ বিল বাবদ</span><span class="rv">{elec_paid} টাকা{f" ({paid_elec_units} ইউনিট)" if has_elec and paid_elec_units > 0 else ""}</span></div></div>', unsafe_allow_html=True)
+
+    if total_due == 0:
+        st.markdown('<div style="text-align:center;background:#0d2219;border:1.5px solid #3dd68c;border-radius:10px;padding:12px;margin-top:8px;color:#3dd68c;font-weight:700;">🎉 সম্পূর্ণ বিল পরিশোধিত। কোনো বকেয়া নেই!</div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div class="sbox red"><div class="sbox-title" style="color:#ff6b6b;">⚠️ বর্তমান বকেয়া (Due)</div><div class="row"><span class="rl">সর্বমোট বকেয়া</span><span class="rv red">{total_due} টাকা</span></div><div class="row"><span class="rl">ভাড়া বকেয়া</span><span class="rv red">{new_rent_due} টাকা</span></div><div class="row"><span class="rl">ময়লা বিল বকেয়া</span><span class="rv red">{new_garbage_due} টাকা</span></div><div class="row"><span class="rl">বিদ্যুৎ বিল বকেয়া</span><span class="rv red">{new_elec_due} টাকা{f" ({due_elec_units} ইউনিট)" if has_elec and due_elec_units > 0 else ""}</span></div></div>', unsafe_allow_html=True)
+
+    if has_elec and elec_paid > 0:
+        st.markdown(f'<div class="info-box">🔌 <strong style="color:#c8d8e8;">মিটার আপডেট:</strong> {prev_reading} + {paid_elec_units} ইউনিট পরিশোধিত = <strong style="color:#f0c040;">নতুন সেভড রিডিং: {new_saved_reading}</strong></div>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # --- রসিদ ও সেভ বাটন ---
+    st.markdown('<div class="card"><div class="card-title">📲 রসিদ ও সেভ</div>', unsafe_allow_html=True)
+    
     # রসিদ প্রিভিউ
     elec_info = f"{total_elec_payable}"
     if has_elec and not auto_due_mode:
