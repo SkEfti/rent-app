@@ -63,6 +63,11 @@ def load_data():
     return conn.read(spreadsheet=SHEET_URL)
 
 def save_to_gsheets(df, idx, rent_due, garb_due, elec_due, reading, current_month_str, history_data):
+    # 🚨 ম্যাজিক ফিক্স: পাইথনকে জোর করে বলা হচ্ছে যে এটি টেক্সট কলাম
+    if 'সর্বশেষ আপডেট মাস' not in df.columns:
+        df['সর্বশেষ আপডেট মাস'] = ""
+    df['সর্বশেষ আপডেট মাস'] = df['সর্বশেষ আপডেট মাস'].astype(str)
+
     # ১. মেইন শিট আপডেট (রুম ডাটা)
     df.at[idx, 'বকেয়া ভাড়া']   = rent_due
     df.at[idx, 'বকেয়া ময়লা']    = garb_due
